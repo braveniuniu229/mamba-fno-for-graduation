@@ -1,0 +1,23 @@
+{
+    "lr": 0.01,
+    "arch": "dualUNet_basic",
+    "weightdecay": 0.01,
+    "dataset": "cylinder",
+    "epochs": 400,
+    "tag": "baseline",
+    "lr_decay_epoch": 100,
+    "batch_size": 32,
+    "ckpt_pth": "ckpt",
+    "fig_pth": "fig",
+    "result_pth": "result",
+    "data_pth": "../data/cylinder.npy",
+    "random": true,
+    "num_points": 16,
+    "val_interval": 5,
+    "num_blocks": 2,
+    "d_state": 1024,
+    "d_conv": 3,
+    "d_model": 16,
+    "d_model_out": 76416,
+    "expand": 2
+}

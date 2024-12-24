@@ -1,0 +1,9 @@
+# 忽略某些目录
+data/
+*/experiment_log
+
+# 忽略某些文件类型
+*.pyc
+*.log
+*.pth
+*.csv

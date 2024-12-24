@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="SshConfigs">
+    <configs>
+      <sshConfig host="dzeshell.hpccube.com" id="6d9476fd-062b-49a4-af16-610da3b50afc" keyPath="C:\Users\idrl\Downloads\dzeshell.hpccube.com_0723104936_rsa.txt" port="65032" nameFormat="DESCRIPTIVE" username="braveniuniu" useOpenSSHConfig="true" />
+    </configs>
+  </component>
+</project>
