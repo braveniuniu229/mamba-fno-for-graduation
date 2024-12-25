@@ -45,7 +45,7 @@ save_args(args,os.path.join(ckpt_dir,"args.json"))
 device = torch.device("cuda")
 
 
-train_dataset = CylinderDatasetLSTMBeta(data_path=args.data_pth , train=True, slice_lengths=[2, 5, 10, 20,25, 30,40, 51, 80,100])
+train_dataset = CylinderDatasetLSTMBeta(data_path=args.data_pth , train=True, slice_lengths=[2, 5, 10, 20,25, 30,40, 51])
 train_sampler = SameLengthBatchSampler(train_dataset.slices, batch_size=args.batch_size)
 testdataset = CylinderDatasetLSTMBeta(data_path=args.data_pth, train=False)
 trainloader = DataLoader(train_dataset, batch_sampler=train_sampler, collate_fn=None)

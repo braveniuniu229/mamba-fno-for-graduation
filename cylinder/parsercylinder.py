@@ -23,7 +23,7 @@ def parse_args():
     parser.add_argument('--modes2', type=int, default=90)
     parser.add_argument('--width', type=int, default=12)
     parser.add_argument('--modes', type=int, default=16)
-
+    parser.add_argument('--device', type=str, default='cuda:0', help='Device to use for training')
 
 
 

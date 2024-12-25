@@ -1,3 +1,5 @@
+import sys
+
 import torch
 import torch.nn.functional as F
 import logging
@@ -10,7 +12,7 @@ from dataset.cylinderdataset import CylinderDatasetLSTM
 from parsercylinder import parse_args
 # from tools.visualization import plot3x1
 from tools.utils import cre
-import sys
+
 from  tools.visualization import plot3x1
 print(sys.path)
 
@@ -44,7 +46,7 @@ os.makedirs(fig_dir, exist_ok=True)
 os.makedirs(result_dir, exist_ok=True)
 #保存训练参数到ckpt
 save_args(args,os.path.join(ckpt_dir,"args.json"))
-device = torch.device("cuda")
+device = args.device
 dataset_train = CylinderDatasetLSTM(args.data_pth, train=True, train_ratio=0.8, random_points=args.random,
                                    num_points=args.num_points)
 dataset_test = CylinderDatasetLSTM(args.data_pth, train=False, train_ratio=0.8, random_points=args.random,
