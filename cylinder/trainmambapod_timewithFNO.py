@@ -43,7 +43,7 @@ os.makedirs(result_dir, exist_ok=True)
 #保存训练参数到ckpt
 save_args(args,os.path.join(ckpt_dir,"args.json"))
 device = torch.device("cuda")
-
+111
 
 train_dataset = CylinderDatasetLSTMBeta(data_path=args.data_pth , train=True, slice_lengths=[2, 5, 10, 20,25, 30,40, 51])
 train_sampler = SameLengthBatchSampler(train_dataset.slices, batch_size=args.batch_size)
