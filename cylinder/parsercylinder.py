@@ -16,7 +16,7 @@ def parse_args():
     parser.add_argument('--random', type=bool, default=False)
     parser.add_argument('--num_points', type=int, default=16)
     parser.add_argument('--val_interval', type=int, default=5)
-    parser.add_argument('--num_blocks',type=int,default=10)
+    parser.add_argument('--num_blocks',type=int,default=20)
     parser.add_argument('--d_state', type=int, default=64)
     parser.add_argument('--d_conv', type=int, default=3)
     parser.add_argument('--modes1', type=int, default=90)
