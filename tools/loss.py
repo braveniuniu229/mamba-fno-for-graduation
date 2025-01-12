@@ -28,6 +28,29 @@ class OHEM2d(torch.nn.Module):
         return torch.mean(torch.abs(diff * (inputs - targets)))
 
 
+def max_aeLoss(output, label):
+    """
+    Compute the Max Absolute Error Loss.
+
+    Parameters:
+    - output: Tensor of shape (batch, H, W), the model's output.
+    - label: Tensor of shape (batch, H, W), the ground truth.
+
+    Returns:
+    - loss: Scalar tensor, the mean max absolute error across the batch.
+    """
+    # 确保输出和标签的形状一致
+    assert output.shape == label.shape, f"Output shape {output.shape} and Label shape {label.shape} must match!"
+
+    # 计算绝对误差
+    abs_error = torch.abs(output - label)  # Shape: (batch, H, W)
+
+    # 对每个样本取最大值 (H, W 的范围内)
+    max_error_per_sample = torch.max(abs_error.view(abs_error.size(0), -1), dim=1)[0]  # Shape: (batch,)
+
+    # 对批次中的样本取均值
+    loss = torch.mean(max_error_per_sample)  # Scalar
+    return loss
 class Max_aeLoss(nn.Module):
     def __init__(self):
         super(Max_aeLoss, self).__init__()

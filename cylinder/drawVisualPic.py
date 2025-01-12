@@ -35,7 +35,7 @@ def save_pod_time_pic(data_path,n_component_num,save_dir):
         plt.close()
 
         print(f"Saved: {output_path}")
-
+=
 def save_flow_field_at_intervals(data_path, t_interval, save_dir):
     """
     每隔 t_interval 个时刻保存流场图像。
