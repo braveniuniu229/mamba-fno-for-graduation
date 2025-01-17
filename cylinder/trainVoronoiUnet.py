@@ -139,7 +139,7 @@ def main():
         # Testing every 5 epochs
         if epoch % 5 == 0:
             test_loss_l1, test_loss_max_ae = test_model(model, test_loader, device)
-            test_loss = test_loss_l1 + test_loss_max_ae
+            test_loss = test_loss_l1
 
             # Save checkpoint if test loss improves
             is_best = test_loss < best_test_loss

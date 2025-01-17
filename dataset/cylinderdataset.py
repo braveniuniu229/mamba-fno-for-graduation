@@ -191,17 +191,19 @@ if __name__ == "__main__":
     # val_dataset = CylinderDatasetLSTM(data_path=path, train=False)
     # train_loader = DataLoader(train_dataset, batch_sampler=train_sampler,collate_fn=None)
     # val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)
-    t1 =CylinderDatasetMLP(data_path=path,train=True,random_points=False,num_points=16)
-    t2 = CylinderDatasetMLP(data_path=path,train=False, random_points=False, num_points=16)
-    train_loader =DataLoader(dataset=t1,batch_size=32)
-    val_loader = DataLoader(dataset=t2, batch_size=32)
-
-
-
-    for data, label in train_loader:
-        print(data.shape, label.shape)
-    print(1111)
-    for data, label in val_loader:
-        print(data.shape, label.shape)
-    print(1111)
+    # t1 =CylinderDatasetMLP(data_path=path,train=True,random_points=False,num_points=16)
+    # t2 = CylinderDatasetMLP(data_path=path,train=False, random_points=False, num_points=16)
+    # train_loader =DataLoader(dataset=t1,batch_size=32)
+    # val_loader = DataLoader(dataset=t2, batch_size=32)
+    #
+    #
+    #
+    # for data, label in train_loader:
+    #     print(data.shape, label.shape)
+    # print(1111)
+    # for data, label in val_loader:
+    #     print(data.shape, label.shape)
+    # print(1111)
+    data = np.load(path)
+    print(data.shape)
 

@@ -39,7 +39,7 @@ def rf_regression(train_inputs, train_outputs, val_inputs, val_outputs):
         test_fold=np.concatenate([-1 * np.ones((train_inputs.shape[0], 1)), np.zeros((val_inputs.shape[0], 1))],
                                  axis=0)
     )
-    tuned_parameter = [{'n_estimators': [100, 300, 500, 1000]}]
+    tuned_parameter = [{'n_estimators': [100, 300, 500]}]
     rfr = RandomForestRegressor()
     rfr_c = GridSearchCV(estimator=rfr, param_grid=tuned_parameter, cv=ps, n_jobs=4)
     rfr_c.fit(X, y)
@@ -73,21 +73,20 @@ def gp_regression(train_inputs, train_outputs, val_inputs, val_outputs):
     gpr.fit(train_inputs, train_outputs)
     return gpr
 
+
+
 if __name__ == "__main__":
-    train_input = np.random.randn(100, 16)  # 100个训练样本，每个有16个特征
-    train_output = np.random.rand(100, 20000)  # 对应100个样本，每个有20000个输出目标
-    test_input = np.random.randn(51, 16)  # 51个测试样本
-    test_output = np.random.randn(51, 20000)  # 对应的测试输出
-    svr_model = svr_regression(train_input, train_output, train_input, train_output)
-    svr_predictions = svr_model.predict(test_input)
-    print('SVR Predictions Shape:', svr_predictions.shape)
+    train_input = np.random.randn(50, 16)  # 100个训练样本，每个有16个特征
+    train_output = np.random.rand(50, 32)  # 对应100个样本，每个有20000个输出目标
+    test_input = np.random.randn(50, 16)  # 51个测试样本
+    test_output = np.random.randn(50, 32)  # 对应的测试输出
+    # svr_model = svr_regression(train_input, train_output, train_input, train_output)
+    # svr_predictions = svr_model.predict(test_input)
+    # print('SVR Predictions Shape:', svr_predictions.shape)
 
-    # Random Forest 模型训练与预测
-    rf_model = rf_regression(train_input, train_output, train_input, train_output)
-    rf_predictions = rf_model.predict(test_input)
-    print('Random Forest Predictions Shape:', rf_predictions.shape)
+    rf_model = rf_regression(train_input,train_output,train_input,train_output)
+    rf_prediction = rf_model.predict(test_input)
 
-    # Gaussian Process 模型训练与预测
-    gp_model = gp_regression(train_input, train_output, train_input, train_output)
-    gp_predictions = gp_model.predict(test_input)
-    print('Gaussian Process Predictions Shape:', gp_predictions.shape)
+    print(rf_prediction.shape)
+    print(np.mean(test_output))
+    print(np.mean(rf_prediction-test_output))
