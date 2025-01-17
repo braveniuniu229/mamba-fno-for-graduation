@@ -9,7 +9,8 @@ from models.mambawithPOD import MambaPOD_time_FNO
 from dataset.cylinderdataset import CylinderDatasetLSTMBeta,SameLengthBatchSampler
 from parsercylinder import parse_args
 from tools.visualization import plot3x1,generate_gif_from_data
-from tools.loss import Max_aeLoss
+from tools.loss import max_aeLoss
+import numpy as np
 
 
 # Configure the arguments
@@ -50,6 +51,27 @@ train_sampler = SameLengthBatchSampler(train_dataset.slices, batch_size=args.bat
 testdataset = CylinderDatasetLSTMBeta(data_path=args.data_pth, train=False)
 trainloader = DataLoader(train_dataset, batch_sampler=train_sampler, collate_fn=None)
 testloader = DataLoader(testdataset, batch_size=1, shuffle=False)
+# Function to save five points' predicted values to CSV file
+def recordpoint(model, testloader, top_5_coords, device, file_name="TPSSM-FNO_predicted_values.csv"):
+    predicted_values = []
+
+    model.eval()
+    with torch.no_grad():
+        for inputs, outputs in testloader:
+            inputs = inputs.to(device)
+
+            # Get predictions
+            predictions = model(inputs).squeeze(0)
+
+            # Extract the predicted values for the 5 points
+            for coord in top_5_coords:
+                i, j = coord
+                point_pred_values = predictions[:, i * 199 + j].cpu().numpy()  # Adjust the indexing based on model output size
+                predicted_values.append(point_pred_values)
+
+    # Save the predicted values to CSV file
+    np.savetxt(file_name, np.array(predicted_values).T, delimiter=",")
+    print(f"Predicted values saved to {file_name}")
 
 def train():
     global best_loss
@@ -149,7 +171,6 @@ def train():
 
 def test():
     # 加载模型
-    maxaeLoss = Max_aeLoss()
 
     net = MambaPOD_time_FNO(
         modes1=args.modes1,
@@ -187,10 +208,10 @@ def test():
         pbar = tqdm.tqdm(total=len(testloader), desc="Testing", leave=True, colour='white')
         for inputs, outputs in testloader:
             inputs, outputs = inputs.to(device), outputs.to(device)
-
-            pre = net(inputs)
+            outputs = outputs.squeeze(0)
+            pre = net(inputs).squeeze(0)
             l1_loss_value = F.l1_loss(pre, outputs).item() * inputs.size(0)
-            maxae_loss_value = maxaeLoss(pre, outputs).item() * inputs.size(0)
+            maxae_loss_value = max_aeLoss(pre, outputs).item() * inputs.size(0)
 
             total_l1_loss += l1_loss_value
             total_maxae_loss += maxae_loss_value
@@ -210,16 +231,82 @@ def test():
                 # pres_list.append(predicted_values)
 
             pbar.update(1)
-        # avg_l1_loss = total_l1_loss / total_samples
-        # avg_maxae_loss = total_maxae_loss / total_samples
+        avg_l1_loss = total_l1_loss / total_samples
+        avg_maxae_loss = total_maxae_loss / total_samples
         # output_gif = os.path.join(fig_dir, 'output.gif')
         # generate_gif_from_data(fields_list, pres_list, output_gif)
         # print(f"GIF saved as {output_gif}")
         #
-        # print(f'Average L1 Loss: {avg_l1_loss}, Average Max AE Loss: {avg_maxae_loss}')
+        print(f'Average L1 Loss: {avg_l1_loss}, Average Max AE Loss: {avg_maxae_loss}')
 
+def val():
+    # Initialize the model
+    net = MambaPOD_time_FNO(
+        modes1=args.modes1,
+        modes2=args.modes2,
+        width=args.width,
+        d_model=args.d_model,
+        num_blocks=args.num_blocks,
+        d_state=args.d_state,
+        d_model_out=args.d_model_out,
+        rms_norm=True,
+        residual_in_fp32=True,
+        fused_add_norm=True,
+        final_pool_type="mean",
+        if_abs_pos_embed=True,
+        if_rope=False,
+        if_rope_residual=False,
+        bimamba_type="V2",
+        if_cls_token=True,
+        if_devide_out=True,
+        use_middle_cls_token=True
+    ).to(device)
+
+    # Load the checkpoint
+    checkpoint_path = os.path.join(ckpt_dir, 'checkpoint_best.pth')
+    checkpoint = torch.load(checkpoint_path)
+    net.load_state_dict(checkpoint['model_state_dict'])
+    net.eval()
+
+    total_l1_loss = 0.0
+    total_maxae_loss = 0.0
+    total_samples = 0
+
+    # Define five points coordinates (change if needed)
+    top_5_coords =  [(1, 66), (1, 67), (0, 66), (0, 68), (0, 67)]
+
+    # Call the function to save predictions for the five points
+    recordpoint(net, testloader, top_5_coords, device, file_name="TPSSM-FNO_predicted_values.csv")
+
+    with torch.no_grad():
+        pbar = tqdm.tqdm(total=len(testloader), desc="Validation", leave=True, colour='white')
+        for inputs, outputs in testloader:
+            inputs, outputs = inputs.to(device), outputs.to(device)
+
+            # Get predictions from the model
+            outputs = outputs.squeeze(0)
+            pre = net(inputs).squeeze(0)
+
+            # Calculate L1 loss and MaxAE loss
+            l1_loss_value = F.l1_loss(pre, outputs).item() * inputs.size(0)
+            maxae_loss_value = max_aeLoss(pre, outputs).item() * inputs.size(0)
+
+            total_l1_loss += l1_loss_value
+            total_maxae_loss += maxae_loss_value
+            total_samples += inputs.size(0)
+
+            pbar.set_postfix(l1_loss=l1_loss_value, maxae_loss=maxae_loss_value)
+            pbar.update(1)
+
+    avg_l1_loss = total_l1_loss / total_samples
+    avg_maxae_loss = total_maxae_loss / total_samples
+
+    print(f"Validation L1 Loss: {avg_l1_loss:.4f}")
+    print(f"Validation MaxAE Loss: {avg_maxae_loss:.4f}")
+
+    return avg_l1_loss, avg_maxae_loss
 
 if __name__ == '__main__':
-    train()
-    print("best val loss{}".format(best_loss))
-    test()
+    # train()
+    # print("best val loss{}".format(best_loss))
+    val()

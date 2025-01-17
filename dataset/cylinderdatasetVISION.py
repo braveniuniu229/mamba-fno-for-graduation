@@ -42,13 +42,13 @@ class CylinderDatasetVoronoi1D(Dataset):
 
         # Determine split sizes
         self.length = self.data.shape[0]
-        self.num_train = int(self.length * train_ratio)
+        self.num_train = 100
         self.num_test = self.length - self.num_train
 
         if self.train:
             self.timeslide = np.arange(self.num_train)
         else:
-            self.timeslide = np.arange(self.num_train, self.length)
+            self.timeslide = np.arange(100,151)
 
     def __len__(self):
         return len(self.timeslide)
@@ -101,7 +101,7 @@ class CylinderDatasetLSTM(Dataset):
 
         # Determine split sizes
         self.length = self.data.shape[0]
-        self.num_train = int(self.length * train_ratio)
+        self.num_train = 100
         self.num_test = self.length - self.num_train
 
         if self.train:
@@ -123,8 +123,8 @@ class CylinderDatasetLSTM(Dataset):
 # Example usage
 if __name__ == "__main__":
     path = '../data/cylinder.npy'
-    dataset_train = CylinderDatasetVoronoi1D(path, train=True, train_ratio=0.8, random_points=False, num_points=16)
-    dataset_test = CylinderDatasetVoronoi1D(path, train=False, train_ratio=0.8, random_points=True, num_points=16)
+    dataset_train = CylinderDatasetLSTM(path, train=True, train_ratio=0.8, random_points=False, num_points=16)
+    dataset_test = CylinderDatasetLSTM(path, train=False, train_ratio=0.8, random_points=True, num_points=16)
 
 
     trainloader = DataLoader(dataset_train, shuffle=True, batch_size=10)

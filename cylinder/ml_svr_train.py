@@ -16,8 +16,8 @@ def load_and_split_data(data):
     # 训练集与测试集的划分（前100为训练集，后51为测试集）
     n = data.shape[1]
     selected_indices = np.linspace(0, n - 1, 16, dtype=int)
-    train_inputs, val_inputs = data[:100,selected_indices], data[100:,selected_indices]
-    train_outputs, val_outputs = data[:100,], data[100:]
+    train_inputs, val_inputs = data[:100,selected_indices], data[135:150,selected_indices]
+    train_outputs, val_outputs = data[:100,], data[135:150]
 
     return train_inputs, train_outputs, val_inputs, val_outputs
 
@@ -68,35 +68,70 @@ def plot_and_save_difference(true_output, predicted_output, sample_idx, output_d
     plt.savefig(f"{output_dir}/abs_diff_sample_{sample_idx}.png")
     plt.close()
 
-
-if __name__ == "__main__":
-    # 假设你的数据已经以 (151, 384*199) 形式存在
+def val():
+    # Load data (validation data from the cylinder.npy file)
     data = np.load('../data/cylinder.npy')
 
-    # 加载并划分数据
+    # Split data (train, val datasets)
     train_inputs, train_outputs, val_inputs, val_outputs = load_and_split_data(data)
 
-    # 训练SVR模型
+    # Initialize SVR model and train
     svr_model = svr_regression(train_inputs, train_outputs, train_inputs, train_outputs)
     svr_predictions = svr_model.predict(val_inputs)
 
-    print(svr_predictions.shape)  # 预计输出 (51, 384*199)
+    print(svr_predictions.shape)  # Expected output: (51, 384*199)
 
-    # 计算损失
+    # Compute losses
     mean_abs_error_per_sample, max_abs_error_per_sample = compute_losses(val_outputs, svr_predictions)
 
-    # 输出损失信息
+    # Output the loss information
     print(f"Mean Absolute Error per Sample: {mean_abs_error_per_sample}")
     print(f"Max Absolute Error per Sample: {max_abs_error_per_sample}")
 
-    # 随机选择5个样本绘制误差图
-    random_sample_indices = random.sample(range(51), 5)
-    dir_name = "ml_svr"
-    os.makedirs(dir_name,exist_ok=True)
-    for idx in random_sample_indices:
-        ground_truth = val_outputs[idx].reshape(384,199)
-        prediction = svr_predictions[idx].reshape(384,199)
+    # # Create directory to save images if it doesn't exist
+    # output_dir = os.path.join("output_images", "svr_val")
+    # os.makedirs(output_dir, exist_ok=True)
+    #
+    # # Randomly select 5 samples to plot
+    # random_sample_indices = random.sample(range(51), 5)
+    # for idx in random_sample_indices:
+    #     ground_truth = val_outputs[idx].reshape(384, 199)
+    #     prediction = svr_predictions[idx].reshape(384, 199)
+    #
+    #     # Plot and save the error images
+    #     plot_and_save_difference(ground_truth, prediction, idx, output_dir)
+    #
+    # print(f"Validation completed. Results saved to {output_dir}")
 
-        file_name = f"output_image_{idx}.png"
-        save_dir = os.path.join(dir_name,file_name)
-        plot3x1(ground_truth, prediction, save_dir)
+if __name__ == "__main__":
+    # # 假设你的数据已经以 (151, 384*199) 形式存在
+    # data = np.load('../data/cylinder.npy')
+    #
+    # # 加载并划分数据
+    # train_inputs, train_outputs, val_inputs, val_outputs = load_and_split_data(data)
+    #
+    # # 训练SVR模型
+    # svr_model = svr_regression(train_inputs, train_outputs, train_inputs, train_outputs)
+    # svr_predictions = svr_model.predict(val_inputs)
+    #
+    # print(svr_predictions.shape)  # 预计输出 (51, 384*199)
+    #
+    # # 计算损失
+    # mean_abs_error_per_sample, max_abs_error_per_sample = compute_losses(val_outputs, svr_predictions)
+    #
+    # # 输出损失信息
+    # print(f"Mean Absolute Error per Sample: {mean_abs_error_per_sample}")
+    # print(f"Max Absolute Error per Sample: {max_abs_error_per_sample}")
+    #
+    # # 随机选择5个样本绘制误差图
+    # random_sample_indices = random.sample(range(51), 5)
+    # dir_name = "ml_svr"
+    # os.makedirs(dir_name,exist_ok=True)
+    # for idx in random_sample_indices:
+    #     ground_truth = val_outputs[idx].reshape(384,199)
+    #     prediction = svr_predictions[idx].reshape(384,199)
+    #
+    #     file_name = f"output_image_{idx}.png"
+    #     save_dir = os.path.join(dir_name,file_name)
+    #     plot3x1(ground_truth, prediction, save_dir)
+    val()

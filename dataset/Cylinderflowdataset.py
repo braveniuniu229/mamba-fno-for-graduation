@@ -194,7 +194,7 @@ class cylinderflowdatasetLSTM(Dataset):
         return torch.tensor(input, dtype=torch.float32), torch.tensor(output, dtype=torch.float32)
 if __name__ == "__main__":
     path = '../data/flow_cylinder.npy'
-    train_dataset = CylinderflowDatasetLSTMBeta(data_path=path, train=True, slice_lengths=[2, 5, 10, 20, 30, 50,100,120])
+    train_dataset = CylinderflowDatasetLSTMBeta(data_path=path, train=True, slice_lengths=[5])
     train_sampler = SameLengthBatchSampler(train_dataset.slices, batch_size=32)
     val_dataset = CylinderflowDatasetLSTMBeta(data_path=path, train=False)
     train_loader = DataLoader(train_dataset, batch_sampler=train_sampler,collate_fn=None)

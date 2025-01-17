@@ -6,16 +6,17 @@ import os
 import tqdm
 from torch.utils.data import DataLoader
 from utils.tools import save_checkpoint, count_parameters, write_to_csv, save_args
-from dataset.cylinderdataset import CylinderDatasetLSTM
+from dataset.cylinderdataset import CylinderDatasetLSTMBeta,SameLengthBatchSampler
 from parsercylinder import parse_args
 from tools.utils import cre
 from tools.visualization import plot3x1
-from tools.loss import Max_aeLoss
+from tools.loss import max_aeLoss
 from models.lstm import LSTMModel
+import numpy as np
 
 # 配置参数
 args = parse_args()
-args.arch = "LSTM_Model_classic_train"
+args.arch = "LSTM_Model2"
 args.d_model = args.num_points
 args.d_model_out = 76416
 
@@ -36,10 +37,10 @@ os.makedirs(result_dir, exist_ok=True)
 save_args(args, os.path.join(ckpt_dir, "args.json"))
 device = torch.device("cuda")
 
-train_dataset = CylinderDatasetLSTM(data_path=args.data_pth, train=True)
-
-test_dataset = CylinderDatasetLSTM(data_path=args.data_pth, train=False)
-trainloader = DataLoader(train_dataset, collate_fn=None)
+train_dataset = CylinderDatasetLSTMBeta(data_path=args.data_pth, train=True, slice_lengths=[5])
+train_sampler = SameLengthBatchSampler(train_dataset.slices, batch_size=32)
+trainloader =  DataLoader(train_dataset, batch_sampler=train_sampler,collate_fn=None)
+test_dataset = CylinderDatasetLSTMBeta(data_path=args.data_pth,train=False)
 testloader = DataLoader(test_dataset, batch_size=1, shuffle=False)
 
 
@@ -113,7 +114,6 @@ def train():
 
 def test():
     # 加载模型
-    maxaeLoss = Max_aeLoss()
     net = LSTMModel(input_size=args.num_points, hidden_size=128, output_size=76416, num_layers=2).to(device)
 
     # 加载checkpoint
@@ -131,22 +131,22 @@ def test():
 
             pre = net(inputs)
             l1_loss_value = F.l1_loss(pre, outputs).item() * inputs.size(0)
-            maxae_loss_value = maxaeLoss(pre, outputs).item() * inputs.size(0)
+            maxae_loss_value = max_aeLoss(pre, outputs).item() * inputs.size(0)
 
             total_l1_loss += l1_loss_value
             total_maxae_loss += maxae_loss_value
             total_samples += inputs.size(0)
 
             # reshape outputs and predictions
-            pre_reshaped = pre.view(inputs.size(0), 31, 384, 199)
-            outputs_reshaped = outputs.view(inputs.size(0), 31, 384, 199)
-
-            for j in range(inputs.size(0)):
-                for i in range(0, 31, 5):
-                    true_values = outputs_reshaped[j, i].cpu().numpy()
-                    predicted_values = pre_reshaped[j, i].cpu().numpy()
-
-                    plot3x1(true_values, predicted_values, file_name=os.path.join(fig_dir, f'figure_{j}_{i}.png'))
+            # pre_reshaped = pre.view(inputs.size(0), 31, 384, 199)
+            # outputs_reshaped = outputs.view(inputs.size(0), 31, 384, 199)
+            #
+            # for j in range(inputs.size(0)):
+            #     for i in range(0, 31, 5):
+            #         true_values = outputs_reshaped[j, i].cpu().numpy()
+            #         predicted_values = pre_reshaped[j, i].cpu().numpy()
+            #
+            #         plot3x1(true_values, predicted_values, file_name=os.path.join(fig_dir, f'figure_{j}_{i}.png'))
 
             pbar.update(1)
 
@@ -154,8 +154,107 @@ def test():
     avg_maxae_loss = total_maxae_loss / total_samples
 
     print(f'Average L1 Loss: {avg_l1_loss}, Average Max AE Loss: {avg_maxae_loss}')
+def val():
+    # Initialize model
+    net = LSTMModel(input_size=args.num_points, hidden_size=128, output_size=76416, num_layers=2).to(device)
 
-if __name__ == '__main__':
-    train()
-    print("best val loss{}".format(best_loss))
-    test()
+    # Load the checkpoint
+    checkpoint_path = os.path.join(ckpt_dir, 'checkpoint_best.pth')
+    if os.path.exists(checkpoint_path):
+        checkpoint = torch.load(checkpoint_path)
+        net.load_state_dict(checkpoint['model_state_dict'])
+        print(f"Loaded checkpoint from {checkpoint_path}")
+    else:
+        print(f"No checkpoint found at {checkpoint_path}")
+        return
+
+    # Switch model to evaluation mode
+    net.eval()
+
+    total_l1_loss = 0.0
+    total_maxae_loss = 0.0
+    total_samples = 0
+
+    # Perform validation
+    with torch.no_grad():
+        pbar = tqdm.tqdm(total=len(testloader), desc="Validation", leave=True, colour='white')
+        for inputs, outputs in testloader:
+            inputs, outputs = inputs.to(device), outputs.to(device)
+
+            # Get predictions from the model
+            pre = net(inputs)
+
+            # Calculate losses
+            l1_loss_value = F.l1_loss(pre, outputs).item() * inputs.size(0)
+            maxae_loss_value = max_aeLoss(pre, outputs).item() * inputs.size(0)
+
+            # Accumulate the loss values
+            total_l1_loss += l1_loss_value
+            total_maxae_loss += maxae_loss_value
+            total_samples += inputs.size(0)
+
+            pbar.update(1)
+
+    # Compute average loss values
+    avg_l1_loss = total_l1_loss / total_samples
+    avg_maxae_loss = total_maxae_loss / total_samples
+
+    # Print the results
+    print(f'Validation L1 Loss: {avg_l1_loss}')
+    print(f'Validation MaxAE Loss: {avg_maxae_loss}')
+
+# Save predicted values for five specific coordinates
+def record(model, testloader, top_5_coords, device, file_name="lstm_predicted_values.csv"):
+    predicted_values = []
+
+    model.eval()
+    with torch.no_grad():
+        for inputs, _ in testloader:
+            inputs = inputs.to(device)
+
+            # Get model predictions
+            predictions = model(inputs).squeeze(1).reshape(51, -1)  # 51 time steps, multiple points
+
+            for coord in top_5_coords:
+                i, j = coord
+                point_pred_values = predictions[:, i * 199 + j].cpu().numpy()
+                predicted_values.append(point_pred_values)
+
+    np.savetxt(file_name, np.array(predicted_values).T, delimiter=",")
+    print(f"Predicted values saved to {file_name}")
+
+# Get five predefined coordinates
+def get_top_5_coords():
+    return [(1, 66), (1, 67), (0, 66), (0, 68), (0, 67)]
+
+def main():
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    # Initialize the model
+    model = LSTMModel(input_size=16, hidden_size=128, output_size=76416, num_layers=2).to(device)
+
+    # Load the model checkpoint
+    checkpoint_path = os.path.join("experiment_log", "LSTM_Model2", "random_False_numpoints_16", "ckpt", "checkpoint_best.pth")
+    if os.path.exists(checkpoint_path):
+        checkpoint = torch.load(checkpoint_path)
+        model.load_state_dict(checkpoint['model_state_dict'])
+        print(f"Loaded checkpoint from {checkpoint_path}")
+    else:
+        print(f"No checkpoint found at {checkpoint_path}")
+        return
+
+    # DataLoader for testing
+    test_dataset = CylinderDatasetLSTMBeta(data_path='../data/cylinder.npy', train=False)
+    testloader = DataLoader(test_dataset, batch_size=51, shuffle=False)
+
+    # Get the 5 predefined coordinates
+    top_5_coords = get_top_5_coords()
+
+    # Call the record function to save the predicted values to CSV
+    record(model, testloader, top_5_coords, device, file_name="lstm_predicted_values.csv")
+
+
+if __name__ == "__main__":
+    main()
+# if __name__ == '__main__':
+#     val()

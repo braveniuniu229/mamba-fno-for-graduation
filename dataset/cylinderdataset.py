@@ -35,7 +35,7 @@ class CylinderDatasetMLP(Dataset):
         if self.train:
             self.timeslide = np.arange(self.num_train)
         else:
-            self.timeslide = np.arange(self.num_train, self.length)
+            self.timeslide = np.arange(100, 151)
 
     def __len__(self):
         return len(self.timeslide)
@@ -128,7 +128,7 @@ class CylinderDatasetLSTMBeta(Dataset):
         if self.train:
             self.timeslide = np.arange(self.num_train)
         else:
-            self.timeslide = np.arange(self.num_train, self.length)
+            self.timeslide = np.arange(100, 151)
 
         self.data = self.data[self.timeslide, :]
 
@@ -186,15 +186,15 @@ class SameLengthBatchSampler(torch.utils.data.sampler.Sampler):
 # Example usage
 if __name__ == "__main__":
     path = '../data/cylinder.npy'
-    # train_dataset = CylinderDatasetLSTMBeta(data_path=path, train=True, slice_lengths=[2, 5, 10, 20, 30, 50,100,120])
-    # train_sampler = SameLengthBatchSampler(train_dataset.slices, batch_size=32)
-    # val_dataset = CylinderDatasetLSTM(data_path=path, train=False)
-    # train_loader = DataLoader(train_dataset, batch_sampler=train_sampler,collate_fn=None)
-    # val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)
-    # t1 =CylinderDatasetMLP(data_path=path,train=True,random_points=False,num_points=16)
-    # t2 = CylinderDatasetMLP(data_path=path,train=False, random_points=False, num_points=16)
-    # train_loader =DataLoader(dataset=t1,batch_size=32)
-    # val_loader = DataLoader(dataset=t2, batch_size=32)
+    train_dataset = CylinderDatasetLSTMBeta(data_path=path, train=True, slice_lengths=[2, 5, 10, 20, 30, 50,100,120])
+    train_sampler = SameLengthBatchSampler(train_dataset.slices, batch_size=32)
+    val_dataset = CylinderDatasetLSTM(data_path=path, train=False)
+    train_loader = DataLoader(train_dataset, batch_sampler=train_sampler,collate_fn=None)
+    val_loader = DataLoader(val_dataset, batch_size=32, shuffle=False)
+    t1 =CylinderDatasetMLP(data_path=path,train=True,random_points=False,num_points=16)
+    t2 = CylinderDatasetMLP(data_path=path,train=False, random_points=False, num_points=16)
+    train_loader =DataLoader(dataset=t1,batch_size=32)
+    val_loader = DataLoader(dataset=t2, batch_size=32)
     #
     #
     #

@@ -8,7 +8,9 @@ from models.mlp import shallow_decoder
 from dataset.cylinderdataset import CylinderDatasetMLP
 from tools.visualization import plot3x1
 from tools.loss import max_aeLoss
-
+import numpy as np
+import random
+import matplotlib.pyplot as plt
 # Argument parsing
 def parse_args():
     parser = ArgumentParser(description="Training shallow_decoder model")
@@ -156,10 +158,214 @@ def train(args):
 
     print(f"Training completed. Best Validation Loss: {best_loss}, Best Validation MaxAE Loss: {best_maeloss}")
 
+
+
+
+def val(args):
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    # Initialize model and load checkpoint
+    model = shallow_decoder(outputlayer_size=args.output_size, n_sensors=args.n_sensors).to(device)
+    checkpoint_path = os.path.join("shallowdecoder", args.ckpt_pth, "checkpoint.pth")
+
+    # Load model checkpoint
+    if os.path.exists(checkpoint_path):
+        checkpoint = torch.load(checkpoint_path)
+        model.load_state_dict(checkpoint['model_state_dict'])
+        print(f"Loaded checkpoint from {checkpoint_path}")
+    else:
+        print(f"No checkpoint found at {checkpoint_path}")
+        return
+
+    # Dataset and DataLoader for validation
+    test_dataset = CylinderDatasetMLP(data_path=args.data_pth, train=False)
+    testloader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False)
+
+    # Initialize loss variables
+    val_mae, val_maxae, val_num = 0.0, 0.0, 0
+
+    model.eval()
+    with torch.no_grad():
+        pbar = tqdm.tqdm(total=len(testloader), desc="Validation", leave=True, colour='white')
+        for inputs, outputs in testloader:
+            inputs, outputs = inputs.to(device), outputs.to(device)
+
+            # Get model predictions
+            predictions = model(inputs)
+
+            # Calculate losses
+            mae_loss = F.l1_loss(predictions, outputs)
+            max_ae_loss = max_aeLoss(predictions, outputs)
+
+            val_mae += mae_loss.item() * inputs.size(0)
+            val_maxae += max_ae_loss.item() * inputs.size(0)
+            val_num += inputs.size(0)
+
+            pbar.set_postfix(mae=mae_loss.item(), maxae=max_ae_loss.item())
+            pbar.update(1)
+
+    # Calculate average losses
+    val_mae /= val_num
+    val_maxae /= val_num
+
+    # Print the results
+    print(f"Validation MAE: {val_mae}")
+    print(f"Validation MaxAE: {val_maxae}")
+# 计算每个点的平均绝对误差
+def compute_avg_abs_error(testloader, model, device, h, w):
+    abs_errors = np.zeros((h, w))  # 初始化一个大小为 (h, w) 的误差矩阵
+    total_count = np.zeros((h, w))  # 记录每个点的出现次数
+
+    model.eval()
+
+    with torch.no_grad():
+        for inputs, outputs in testloader:
+            inputs, outputs = inputs.to(device), outputs.to(device)
+            predictions = model(inputs)
+
+            for idx in range(inputs.size(0)):  # 遍历 batch
+                pred = predictions[idx].cpu().detach().numpy()  # 取出当前样本的预测值
+                true = outputs[idx].cpu().detach().numpy()  # 取出当前样本的真实值
+
+                # 计算每个点的绝对误差并更新
+                for i in range(h):
+                    for j in range(w):
+                        index = i * w + j
+                        abs_errors[i, j] += abs(pred[index] - true[index])  # 累加绝对误差
+                        total_count[i, j] += 1  # 记录该点的出现次数
+
+    # 计算每个点的平均绝对误差
+    avg_abs_errors = abs_errors / total_count
+    return avg_abs_errors
+
+
+# 获取时序平均误差最大的五个点
+def get_top_5_error_points(avg_abs_errors):
+    # 找到五个最大误差的点
+    flat_indices = np.argsort(avg_abs_errors.flatten())[-5:]  # 找到最大五个点的索引
+    top_5_coords = [(index // avg_abs_errors.shape[1], index % avg_abs_errors.shape[1]) for index in flat_indices]
+    return top_5_coords
+
+
+# 测试函数
+def test(args):
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+    # 加载数据集
+    test_dataset = CylinderDatasetMLP(data_path=args.data_pth, train=False)
+    testloader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False)
+
+    # 初始化模型并加载检查点
+    model = shallow_decoder(outputlayer_size=args.output_size, n_sensors=args.n_sensors).to(device)
+    checkpoint_path = os.path.join("shallowdecoder", args.ckpt_pth, "checkpoint.pth")
+
+    # 加载模型
+    if os.path.exists(checkpoint_path):
+        checkpoint = torch.load(checkpoint_path)
+        model.load_state_dict(checkpoint['model_state_dict'])
+        print(f"Loaded checkpoint from {checkpoint_path}")
+    else:
+        print(f"No checkpoint found at {checkpoint_path}")
+        return
+
+    # 计算所有点的平均绝对误差
+    h, w = 384, 199
+    avg_abs_errors = compute_avg_abs_error(testloader, model, device, h, w)
+
+    # 获取时序平均误差最大的 5 个点的坐标
+    top_5_coords = get_top_5_error_points(avg_abs_errors)
+    print(f"Top 5 error coordinates (h, w): {top_5_coords}")
+
+    # 将这些坐标转化为平面上的索引
+    indices = [i * w + j for i, j in top_5_coords]
+
+    # 创建保存结果的数组
+    predicted_values = []
+    true_values = []
+
+    # 在测试集上进行预测
+    for inputs, outputs in testloader:
+        inputs, outputs = inputs.to(device), outputs.to(device)
+        predictions = model(inputs)
+
+        # 获取 batch 中五个点的预测值
+        for idx in range(inputs.size(0)):  # 遍历 batch
+            pred = predictions[idx].cpu().detach().numpy()  # 取出当前样本的预测值
+            true = outputs[idx].cpu().detach().numpy()  # 取出当前样本的真实值
+
+            # 提取五个点的值
+            pred_values = [pred[index] for index in indices]
+            true_values_for_sample = [true[index] for index in indices]
+
+            predicted_values.append(pred_values)
+            true_values.append(true_values_for_sample)
+
+            # 打印或保存结果
+            print(f"Batch {idx + 1}:")
+            print("Predicted values at selected coordinates:", pred_values)
+            print("True values at selected coordinates:", true_values_for_sample)
+
+    # 将预测值和真实值保存到文件（例如：CSV格式）
+    np.savetxt("shallowdecoder/SD_predicted_values.csv", predicted_values, delimiter=",")
+    np.savetxt("shallowdecoder/true_values.csv", true_values, delimiter=",")
+
+    print("Results saved to SD_predicted_values.csv and true_values.csv.")
+
+
+# 读取CSV文件并返回数据
+def read_csv(file_path):
+    return np.loadtxt(file_path, delimiter=",")
+
+
+# 绘制时序图
+def plot_time_series(predicted_values, true_values, top_5_coords, time_steps=51):
+    for i, coord in enumerate(top_5_coords):
+        # 获取每个点的预测值和真实值
+        pred_vals = predicted_values[:, i]  # 每列是一个点的时序数据
+        true_vals = true_values[:, i]  # 每列是一个点的时序数据
+
+        # 确保每个点的预测值和真实值的长度都为 time_steps（即 52）
+        if len(pred_vals) != time_steps or len(true_vals) != time_steps:
+            print(f"Warning: Data for point {coord} does not have the correct length")
+            continue
+
+        # 创建图形
+        plt.figure(figsize=(10, 6))
+
+        # 时序轴
+        time = np.arange(time_steps)
+
+        # 绘制真实值和预测值
+        plt.plot(time, pred_vals, label="Predicted", marker='o', linestyle='-', color='r')  # 预测值
+        plt.plot(time, true_vals, label="True", marker='x', linestyle='--', color='b')  # 真实值
+
+        # 标记时序为0, 5, 10, 15, 20...的点
+        plt.xticks(time[::5])  # 每5个时刻显示一个标记
+
+        # 添加图形标签
+        plt.title(f"Time Series for Point {coord} (h={coord[0]}, w={coord[1]})")
+        plt.xlabel("Time")
+        plt.ylabel("Value")
+        plt.legend()
+
+        # 显示图形
+        plt.grid(True)
+        plt.show()
+
+
 # Main
 def main():
     args = parse_args()
-    train(args)
+    test(args)
+
 
 if __name__ == "__main__":
+    # predicted_values = read_csv("shallowdecoder/SD_predicted_values.csv")
+    # true_values = read_csv("shallowdecoder/true_values.csv")
+    # top_5_coords = [(40, 50), (120, 100), (200, 150), (250, 170), (310, 180)]  # 示例坐标
+    #
+    # # 绘制时序图
+    # plot_time_series(predicted_values, true_values, top_5_coords)
     main()
+# Main
+
