@@ -11,6 +11,7 @@ from dataset.cylinderdatasetVISION import CylinderDatasetVoronoi1D
 from tools.loss import max_aeLoss
 from utils.tools import save_checkpoint, count_parameters
 import tqdm
+from tools.visualization import save_error,save_prediction
 import numpy as np
 
 
@@ -62,15 +63,22 @@ def test_model(model, test_loader, device):
             inputs, labels = inputs.to(device), labels.to(device)
 
             outputs = model(inputs)
-            outputs = outputs.squeeze(1).reshape(outputs.shape[0],-1)
-            labels = labels.reshape(outputs.shape[0],-1)
+            outputs = outputs.squeeze(1)
+
+
 
             l1_loss = l1_loss_func(outputs, labels)
             max_ae_loss = max_aeLoss(outputs, labels)
 
             total_l1_loss += l1_loss.item()
             total_max_ae_loss += max_ae_loss.item()
-
+            for i in range(20):
+                truevalues = labels[i].cpu().numpy()
+                predict = outputs[i].cpu().numpy()
+                error_file_name = os.path.join("voronoiUnet_checkpoints", f'time_step{i}_error.png')
+                predicted_file_name = os.path.join("voronoiUnet_checkpoints", f'time_step{i}_predicted.png')
+                save_error(abs(truevalues-predict),error_file_name)
+                save_prediction(predict,predicted_file_name)
     avg_l1_loss = total_l1_loss / len(test_loader)
     avg_max_ae_loss = total_max_ae_loss / len(test_loader)
     print(f"Test: Avg L1 Loss: {avg_l1_loss:.4f}, Avg Max_AE Loss: {avg_max_ae_loss:.4f}")
@@ -164,6 +172,41 @@ def get_top_5_coords():
     return [(1, 66), (1, 67), (0, 66), (0, 68), (0, 67)]
 
 
+
+def trainUNet(model, train_loader, val_loader, optimizer, scheduler, device, checkpoint_dir, num_epochs=500, save_interval=5):
+    model.to(device)
+    best_l1_loss = float('inf')  # Initialize best L1 loss to infinity
+    best_max_ae_loss = float('inf')  # Initialize best Max AE loss to infinity
+
+    for epoch in range(1, num_epochs + 1):
+        # Training one epoch
+        train_l1_loss, train_max_ae_loss = train_one_epoch(model, train_loader, optimizer, scheduler, device, epoch)
+
+        # Every 5 epochs, perform validation and save the model if better
+        if epoch % save_interval == 0:
+            val_l1_loss, val_max_ae_loss = test_model(model, val_loader, device)
+
+            # Check if the current model has the best L1 loss
+            if val_l1_loss < best_l1_loss:
+                best_l1_loss = val_l1_loss
+                best_max_ae_loss = val_max_ae_loss
+                checkpoint_path = os.path.join(checkpoint_dir, "checkpoint_best.pth")
+                torch.save({
+                    'epoch': epoch,
+                    'model_state_dict': model.state_dict(),
+                    'optimizer_state_dict': optimizer.state_dict(),
+                    'scheduler_state_dict': scheduler.state_dict(),
+                    'best_l1_loss': best_l1_loss,
+                    'best_max_ae_loss': best_max_ae_loss,
+                }, checkpoint_path)
+                print(f"Saved model checkpoint at epoch {epoch} with L1 Loss: {best_l1_loss:.4f}, Max AE Loss: {best_max_ae_loss:.4f}")
+            else:
+                print(f"Validation did not improve. Best L1 Loss: {best_l1_loss:.4f}, Best Max AE Loss: {best_max_ae_loss:.4f}")
+
+    print(f"Training completed. Best L1 Loss: {best_l1_loss:.4f}, Best Max AE Loss: {best_max_ae_loss:.4f}")
+    return best_l1_loss, best_max_ae_loss
+
+
 def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -171,36 +214,24 @@ def main():
     model = voronoiUNet().to(device)
 
     # Load the model checkpoint
-    checkpoint_path = os.path.join("VoronoiUnet_checkpoints","checkpoint_best.pth")
+    checkpoint_dir = "voronoiUnet_checkpoints"
+    checkpoint_path = os.path.join(checkpoint_dir, "checkpoint_best.pth")
+
     if os.path.exists(checkpoint_path):
         checkpoint = torch.load(checkpoint_path)
         model.load_state_dict(checkpoint['model_state_dict'])
-        print(f"Loaded checkpoint from {checkpoint_path}")
+        print(f"Loaded model checkpoint from {checkpoint_path}")
     else:
         print(f"No checkpoint found at {checkpoint_path}")
         return
 
     # DataLoader for testing
     test_dataset = CylinderDatasetVoronoi1D(data_path='../data/cylinder.npy', train=False)
-    testloader = DataLoader(test_dataset, batch_size=51, shuffle=False)
+    test_loader = DataLoader(test_dataset, batch_size=51, shuffle=False)
 
-    # Get the 5 predefined coordinates
-    top_5_coords = get_top_5_coords()
-
-    # Call the record function to save the predicted values to CSV
-    record(model, testloader, top_5_coords, device, file_name="voronoiunet_predicted_values.csv")
+    # Call the test function with the loaded model
+    test_model(model, test_loader, device)
 
 
 if __name__ == "__main__":
     main()
-# if __name__ == "__main__":
-#     parser = argparse.ArgumentParser(description="Training VoronoiUNet")
-#     parser.add_argument("--epochs", type=int, default=300, help="Number of total epochs")
-#     parser.add_argument("--batch_size", type=int, default=16, help="Batch size for training")
-#     parser.add_argument("--lr", type=float, default=1e-3, help="Learning rate")
-#     parser.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu", help="Device to use for training")
-#     parser.add_argument("--checkpoint", type=str, default=None, help="Path to checkpoint for resuming training")
-#     parser.add_argument("--path", type=str, default='../data/cylinder.npy', help="Path to dataset")
-#     parser.add_argument("--save_dir", type=str, default="voronoiUnet_checkpoints", help="Directory to save checkpoints")
-#     args = parser.parse_args()
-#     val(args)

@@ -8,7 +8,7 @@ from utils.tools import save_checkpoint,count_parameters, write_to_csv,save_args
 from models.mambawithPOD import MambaPOD_time_FNO
 from dataset.cylinderdataset import CylinderDatasetLSTMBeta,SameLengthBatchSampler
 from parsercylinder import parse_args
-from tools.visualization import plot3x1,generate_gif_from_data
+from tools.visualization import save_error,save_prediction
 from tools.loss import max_aeLoss
 import numpy as np
 
@@ -226,9 +226,9 @@ def test():
                 true_values = outputs_reshaped[0, i].cpu().numpy()
                 predicted_values = pre_reshaped[0, i].cpu().numpy()
 
-                plot3x1(true_values, predicted_values, file_name=os.path.join(fig_dir, f'figure_{i}.png'))
-                # fields_list.append(true_values)
-                # pres_list.append(predicted_values)
+                # plot3x1(true_values, predicted_values, file_name=os.path.join(fig_dir, f'figure_{i}.png'))
+                # # fields_list.append(true_values)
+                # # pres_list.append(predicted_values)
 
             pbar.update(1)
         avg_l1_loss = total_l1_loss / total_samples
@@ -272,11 +272,11 @@ def val():
     total_maxae_loss = 0.0
     total_samples = 0
 
-    # Define five points coordinates (change if needed)
-    top_5_coords =  [(1, 66), (1, 67), (0, 66), (0, 68), (0, 67)]
 
-    # Call the function to save predictions for the five points
-    recordpoint(net, testloader, top_5_coords, device, file_name="TPSSM-FNO_predicted_values.csv")
+
+    # Create a directory for saving figures if it doesn't exist
+    if not os.path.exists(fig_dir):
+        os.makedirs(fig_dir)
 
     with torch.no_grad():
         pbar = tqdm.tqdm(total=len(testloader), desc="Validation", leave=True, colour='white')
@@ -294,6 +294,25 @@ def val():
             total_l1_loss += l1_loss_value
             total_maxae_loss += maxae_loss_value
             total_samples += inputs.size(0)
+
+            # Get the first 5 time steps for both predictions and true values
+            pre_reshaped = pre.view(51, 384, 199)  # Reshape to (time_steps, height, width)
+            outputs_reshaped = outputs.view(51, 384, 199)
+
+            # For each of the first 5 time steps, plot and save the images
+            for i in range(20):
+                true_values = outputs_reshaped[i].cpu().numpy()  # (384, 199)
+                predicted_values = pre_reshaped[i].cpu().numpy()  # (384, 199)
+
+                # Define the file names for saving the plots
+                gt_file_name = os.path.join(fig_dir, f'time_step{i}_gt.png')
+                error_file_name = os.path.join(fig_dir, f'time_step{i}_error.png')
+                predicted_file_name = os.path.join(fig_dir, f'time_step{i}_predicted.png')
+                save_error(abs(true_values - predicted_values),error_file_name)
+                save_prediction(true_values,gt_file_name)
+                save_prediction(predicted_values,predicted_file_name)
+                # Plot and save the true values (labels)
+
 
             pbar.set_postfix(l1_loss=l1_loss_value, maxae_loss=maxae_loss_value)
             pbar.update(1)

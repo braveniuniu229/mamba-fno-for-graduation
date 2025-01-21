@@ -4,6 +4,7 @@ from models.traditionalML import svr_regression
 import random
 from tools.visualization import plot3x1
 import os
+from tools.visualization import save_error,save_prediction
 
 
 # 数据加载和划分
@@ -16,8 +17,8 @@ def load_and_split_data(data):
     # 训练集与测试集的划分（前100为训练集，后51为测试集）
     n = data.shape[1]
     selected_indices = np.linspace(0, n - 1, 16, dtype=int)
-    train_inputs, val_inputs = data[:100,selected_indices], data[135:150,selected_indices]
-    train_outputs, val_outputs = data[:100,], data[135:150]
+    train_inputs, val_inputs = data[:100,selected_indices], data[:,selected_indices]
+    train_outputs, val_outputs = data[:100,], data
 
     return train_inputs, train_outputs, val_inputs, val_outputs
 
@@ -83,6 +84,15 @@ def val():
 
     # Compute losses
     mean_abs_error_per_sample, max_abs_error_per_sample = compute_losses(val_outputs, svr_predictions)
+    fig_pth = os.path.join("ml_svr","figs")
+    os.makedirs(fig_pth,exist_ok=True)
+    for i in range(20):
+        truevalues = val_outputs[i].reshape(384, 199)
+        predict = svr_predictions[i].reshape(384, 199)
+        error_file_name = os.path.join(fig_pth, f'time_step{i}_error.png')
+        predicted_file_name = os.path.join(fig_pth, f'time_step{i}_predicted.png')
+        save_error(abs(truevalues - predict), error_file_name)
+        save_prediction(predict, predicted_file_name)
 
     # Output the loss information
     print(f"Mean Absolute Error per Sample: {mean_abs_error_per_sample}")

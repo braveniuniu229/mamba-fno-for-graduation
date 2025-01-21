@@ -8,8 +8,8 @@ import seaborn as sbs
 import cmocean
 import io
 import imageio
-
-sbs.set_style('whitegrid')
+from matplotlib.colors import Normalize
+from matplotlib.ticker import MaxNLocator
 
 
 def plot3x1(fields, pres, file_name):
@@ -98,7 +98,7 @@ def plot_results(positions, fields,figpath):
         y.append(y_coor[positions[i, 0], positions[i, 1]])
 
     # plt.contourf(x_coor, y_coor, fields, levels=100, cmap='jet')
-    plt.figure(figsize=(10.0, 5.0))
+    plt.figure(figsize=(5.0, 10.0))
     plt.axis('off')
     plt.gca().set_aspect(1)
     # plt.pcolormesh(x_coor, y_coor, fields, cmap=cmocean.cm.balance)
@@ -148,6 +148,64 @@ def generate_gif_from_data(fields_list, pres_list, output_gif):
         images.append(image)
 
     imageio.mimsave(output_gif, images, duration=0.5)
+
+
+def save_prediction(flow_field, save_path): # 创建一个图形
+    plt.figure(figsize=(10, 6))
+
+    # 设置颜色映射和规范化
+
+    norm = Normalize(vmin=-4.4, vmax=4.4)  # 设置颜色条范围为 -4 到 4
+
+    # 绘制流场图
+    img = plt.imshow(flow_field, cmap=cmocean.cm.balance, aspect='auto',norm=norm)
+
+    # 添加颜色条并设置刻度
+    cbar = plt.colorbar(img, ticks=[-4.4, -2.2, 0, 2.2, 4.4])
+    cbar.set_label('Flow Intensity')
+
+    # 去除网格
+    plt.grid(False)
+
+    # 设置标题和标签
+    plt.title('Flow Field Visualization')
+    plt.xlabel('X')
+    plt.ylabel('Y')
+
+    # 保存图像
+    plt.savefig(save_path, dpi=300)
+
+    # 关闭图形窗口
+    plt.close()
+
+def save_error(flow_field, save_path):
+    plt.figure(figsize=(10, 6))
+
+    # 设置颜色范围 (vmin, vmax)
+    vmin = 0
+    vmax = 0.025  # 你设定的最大值
+
+    # 绘制流场图，使用设定的vmin和vmax
+    img = plt.imshow(flow_field, cmap='jet', aspect='auto', vmin=vmin, vmax=vmax)
+
+    # 添加颜色条并设置均匀的刻度分布
+    cbar = plt.colorbar(img)
+    cbar.set_ticks([0,  0.002, 0.007, 0.015, 0.025])  # Set specific ticks
+    cbar.update_ticks()
+
+    # 去除网格
+    plt.grid(False)
+
+    # 设置标题和标签
+    plt.title('error Visualization')
+    plt.xlabel('X')
+    plt.ylabel('Y')
+
+    # 保存图像
+    plt.savefig(save_path, dpi=300)
+
+    # 关闭图形窗口
+    plt.close()
 
 
 

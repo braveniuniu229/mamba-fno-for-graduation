@@ -9,7 +9,7 @@ from utils.tools import save_checkpoint, count_parameters, write_to_csv, save_ar
 from dataset.cylinderdataset import CylinderDatasetLSTMBeta,SameLengthBatchSampler
 from parsercylinder import parse_args
 from tools.utils import cre
-from tools.visualization import plot3x1
+from tools.visualization import save_prediction,save_error
 from tools.loss import max_aeLoss
 from models.lstm import LSTMModel
 import numpy as np
@@ -180,10 +180,10 @@ def val():
         pbar = tqdm.tqdm(total=len(testloader), desc="Validation", leave=True, colour='white')
         for inputs, outputs in testloader:
             inputs, outputs = inputs.to(device), outputs.to(device)
-
+            outputs = outputs.squeeze(0)
             # Get predictions from the model
             pre = net(inputs)
-
+            pre = pre.squeeze(0)
             # Calculate losses
             l1_loss_value = F.l1_loss(pre, outputs).item() * inputs.size(0)
             maxae_loss_value = max_aeLoss(pre, outputs).item() * inputs.size(0)
@@ -192,7 +192,13 @@ def val():
             total_l1_loss += l1_loss_value
             total_maxae_loss += maxae_loss_value
             total_samples += inputs.size(0)
-
+            for i in range(20):
+                truevalues = outputs[i].reshape(384,199).cpu().numpy()
+                predict = pre[i].reshape(384,199).cpu().numpy()
+                error_file_name = os.path.join(fig_dir, f'time_step{i}_error.png')
+                predicted_file_name = os.path.join(fig_dir, f'time_step{i}_predicted.png')
+                save_error(abs(truevalues-predict),error_file_name)
+                save_prediction(predict,predicted_file_name)
             pbar.update(1)
 
     # Compute average loss values
@@ -255,6 +261,6 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    val()
 # if __name__ == '__main__':
 #     val()

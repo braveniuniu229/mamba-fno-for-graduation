@@ -6,7 +6,7 @@ from torch.utils.data import DataLoader
 from argparse import ArgumentParser
 from models.mlp import shallow_decoder
 from dataset.cylinderdataset import CylinderDatasetMLP
-from tools.visualization import plot3x1
+from tools.visualization import save_error,save_prediction
 from tools.loss import max_aeLoss
 import numpy as np
 import random
@@ -43,7 +43,7 @@ def train(args):
 
     # Directories
     os.makedirs(os.path.join("shallowdecoder", args.ckpt_pth), exist_ok=True)
-    os.makedirs(os.path.join("shallowdecoder", args.fig_pth), exist_ok=True)
+    fig_pth = os.makedirs(os.path.join("shallowdecoder", args.fig_pth), exist_ok=True)
     os.makedirs(args.log_pth, exist_ok=True)
 
     # Dataset and DataLoader
@@ -159,8 +159,6 @@ def train(args):
     print(f"Training completed. Best Validation Loss: {best_loss}, Best Validation MaxAE Loss: {best_maeloss}")
 
 
-
-
 def val(args):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -187,31 +185,30 @@ def val(args):
     model.eval()
     with torch.no_grad():
         pbar = tqdm.tqdm(total=len(testloader), desc="Validation", leave=True, colour='white')
+
+        # For each batch, get the predicted and true values
+        all_predictions = []
+        all_outputs = []
         for inputs, outputs in testloader:
             inputs, outputs = inputs.to(device), outputs.to(device)
 
             # Get model predictions
             predictions = model(inputs)
+            fig_pth = os.path.join("shallowdecoder",args.fig_pth)
+            for i in range(20):
+                truevalues = outputs[i].reshape(384, 199).cpu().numpy()
+                predict = predictions[i].reshape(384, 199).cpu().numpy()
+                error_file_name = os.path.join(fig_pth, f'time_step{i}_error.png')
+                predicted_file_name = os.path.join(fig_pth, f'time_step{i}_predicted.png')
+                save_error(abs(truevalues - predict), error_file_name)
+                save_prediction(predict, predicted_file_name)
+            #
 
-            # Calculate losses
-            mae_loss = F.l1_loss(predictions, outputs)
-            max_ae_loss = max_aeLoss(predictions, outputs)
-
-            val_mae += mae_loss.item() * inputs.size(0)
-            val_maxae += max_ae_loss.item() * inputs.size(0)
-            val_num += inputs.size(0)
-
-            pbar.set_postfix(mae=mae_loss.item(), maxae=max_ae_loss.item())
             pbar.update(1)
 
-    # Calculate average losses
-    val_mae /= val_num
-    val_maxae /= val_num
 
-    # Print the results
-    print(f"Validation MAE: {val_mae}")
-    print(f"Validation MaxAE: {val_maxae}")
-# 计算每个点的平均绝对误差
+        # Select the first 5 timesteps
+
 def compute_avg_abs_error(testloader, model, device, h, w):
     abs_errors = np.zeros((h, w))  # 初始化一个大小为 (h, w) 的误差矩阵
     total_count = np.zeros((h, w))  # 记录每个点的出现次数
@@ -356,7 +353,7 @@ def plot_time_series(predicted_values, true_values, top_5_coords, time_steps=51)
 # Main
 def main():
     args = parse_args()
-    test(args)
+    val(args)
 
 
 if __name__ == "__main__":
@@ -366,6 +363,8 @@ if __name__ == "__main__":
     #
     # # 绘制时序图
     # plot_time_series(predicted_values, true_values, top_5_coords)
+    args = parse_args()
+
     main()
 # Main
 
