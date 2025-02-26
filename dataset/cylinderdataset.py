@@ -110,7 +110,7 @@ class CylinderDatasetLSTMBeta(Dataset):
         self.train = train
         self.slice_lengths = slice_lengths
 
-        # Determine number of spatial points
+        # Determine number of spatial points 199 x 384
         num_spatial_points = self.data.shape[1]  # Assuming the second dimension is spatial
 
         # Select points in space
@@ -180,6 +180,57 @@ class SameLengthBatchSampler(torch.utils.data.sampler.Sampler):
         return sum(len(indices) // self.batch_size for indices in self.slice_groups.values())
 
 
+class CylinderDatasetMLP(Dataset):
+    def __init__(self, data_path, train=True, train_ratio=0.8, random_points=False, num_points=16):
+        """
+        Custom dataset initializer.
+        :param data_path: Path to the pickle data file
+        :param train: Boolean flag indicating whether this is training data. Default is True.
+        :param train_ratio: Ratio of data to be used for training. Default is 0.8.
+        :param random_points: Boolean flag indicating whether to select points randomly. Default is False.
+        :param num_points: Number of points to select in space. Default is 16.
+        """
+        # Load data from pickle file
+        with open(data_path, 'rb') as f:
+            data = pickle.load(f)
+
+        # Convert to numpy array if needed
+        data_np = np.array(data)
+
+        # Remove the last dimension (which is 1) and flatten the spatial dimensions
+        # From (5000, 112, 192, 1) to (5000, 112*192)
+        self.data = data_np.reshape(data_np.shape[0], data_np.shape[1] * data_np.shape[2])
+
+        self.train = train
+
+        # Determine number of spatial points
+        num_spatial_points = self.data.shape[1]  # Now this is 112*192
+
+        # Select points in space
+        if random_points:
+            indices = np.random.choice(num_spatial_points, num_points, replace=False)
+        else:
+            indices = np.linspace(0, num_spatial_points - 1, num_points, dtype=int)
+
+        self.points = indices
+
+        # Determine split sizes
+        self.length = self.data.shape[0]
+        self.num_train = int(self.length * train_ratio)
+
+        if self.train:
+            self.timeslide = np.arange(self.num_train)
+        else:
+            self.timeslide = np.arange(self.num_train, self.length)
+
+    def __len__(self):
+        return len(self.timeslide)
+
+    def __getitem__(self, idx):
+        t_idx = self.timeslide[idx]
+        input = self.data[t_idx, self.points]
+        output = self.data[t_idx]
+        return torch.tensor(input, dtype=torch.float32), torch.tensor(output, dtype=torch.float32)
 # Usage
 
 

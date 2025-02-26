@@ -77,8 +77,8 @@ top_5_coords = [(40, 50), (120, 100), (200, 150), (250, 170), (310, 180)]
 # List of models and their corresponding CSV files
 model_files = [
     {"name": "GappyMLP", "predicted": "gappymlp_predicted_values.csv"},
-    {"name": "TPSSM-FNO", "predicted": "TPSSM-FNO_predicted_values.csv"},
-    {"name": "SD", "predicted": "SD_predicted_values.csv"},
+    {"name": "Ours", "predicted": "TPSSM-FNO_predicted_values.csv"},
+    {"name": "Shallow Decoder", "predicted": "SD_predicted_values.csv"},
     {"name": "VoronoiCNN", "predicted": "voronoicnn_predicted_values.csv"},
     {"name": "LSTM", "predicted": "lstm_predicted_values.csv"},
 ]

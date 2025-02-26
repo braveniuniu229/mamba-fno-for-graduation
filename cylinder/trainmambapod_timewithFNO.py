@@ -326,6 +326,6 @@ def val():
     return avg_l1_loss, avg_maxae_loss
 
 if __name__ == '__main__':
-    # train()
-    # print("best val loss{}".format(best_loss))
-    val()
+    train()
+    print("best val loss{}".format(best_loss))
+    # val()

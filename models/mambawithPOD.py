@@ -888,7 +888,7 @@ class  MambaPOD_time_FNO(nn.Module):
                                   if_random_cls_token_position=if_random_cls_token_position,
                                   if_random_token_rank=if_random_token_rank)
         out,_ = self.finalBlock(hidden_states,residual)
-        out = out.view(-1,out.size(1),384,199)
+        out = out.view(-1,out.size(1),112,192)
         out = out.permute(0, 2, 3, 1)
         _,_,_,c = out.size()
         outputs = []
