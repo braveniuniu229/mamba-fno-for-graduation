@@ -1,0 +1,138 @@
+import torch
+import torch.nn.functional as F
+import logging
+import os
+import tqdm
+import numpy as np
+from torch.utils.data import DataLoader
+from utils.tools import save_checkpoint, write_to_csv
+from tools.visualization import save_error, save_prediction
+from tools.loss import max_aeLoss
+from parsercylinder import parse_args
+from dataset.cylinderLong import CylinderDatasetVoronoi1D
+from models.voronoiCNN import VoronoiCNN
+# 配置全局参数
+import numpy as np
+import matplotlib.pyplot as plt
+from models.traditionalML import svr_regression
+import random
+from tools.visualization import plot3x1
+import os
+import pickle
+from tools.visualization import save_error,save_prediction
+
+
+# 数据加载和划分
+def load_and_split_data(data):
+    """
+    划分数据为训练集和测试集。
+    input_data: 输入数据 (形状: num_samples, 384*199)
+    output_data: 输出数据 (形状: num_samples, 384*199)
+    """
+    # 训练集与测试集的划分（前100为训练集，后51为测试集）
+    n = data.shape[1]
+    selected_indices = np.linspace(0, n - 1, 16, dtype=int)
+    train_inputs, val_inputs = data[:500,selected_indices], data[4000:,selected_indices]
+    train_outputs, val_outputs = data[:500,], data[4000:,]
+
+    return train_inputs, train_outputs, val_inputs, val_outputs
+
+
+# 从384*199点中均匀选择16个点作为输入
+
+
+# 计算损失（平均绝对误差和最大绝对误差）
+def compute_losses(true_outputs, predicted_outputs):
+    """
+    计算所有样本的平均绝对误差（MAE）和最大绝对误差的平均值（MaxAE）。
+
+    Args:
+        true_outputs (numpy.ndarray): 真实输出 (num_samples, 384*199)
+        predicted_outputs (numpy.ndarray): 预测输出 (num_samples, 384*199)
+
+    Returns:
+        mean_abs_error (float): 所有样本的平均绝对误差
+        mean_max_abs_error (float): 每个样本的最大绝对误差的平均值
+    """
+    # 计算每个点的绝对误差
+    abs_errors = np.abs(true_outputs - predicted_outputs)
+
+    # 计算所有样本的平均绝对误差（标量）
+    mean_abs_error = np.mean(abs_errors)
+
+    # 计算每个样本的最大绝对误差
+    max_abs_errors_per_sample = np.max(abs_errors, axis=1)
+
+    # 计算最大绝对误差的平均值（标量）
+    mean_max_abs_error = np.mean(max_abs_errors_per_sample)
+
+    return mean_abs_error, mean_max_abs_error
+
+# 绘制并保存误差图像（每个点的误差）
+def plot_and_save_difference(true_output, predicted_output, sample_idx, output_dir="output_images"):
+    """
+    绘制真实输出与预测输出的差异图像，并保存图片。
+    """
+    # 计算绝对误差
+    abs_diff = np.abs(true_output - predicted_output).reshape(384, 199)
+
+    # 设置cmoccean配色
+    plt.figure(figsize=(6, 6))
+    plt.imshow(abs_diff, cmap='cmoccean.deep', interpolation='nearest')
+    plt.colorbar()
+    plt.title(f"Absolute Error (Sample {sample_idx})")
+    plt.savefig(f"{output_dir}/abs_diff_sample_{sample_idx}.png")
+    plt.close()
+
+def val():
+    # Load data (validation data from the cylinder.npy file)
+    with open('../data/Cy_Taira.pickle', 'rb') as f:
+        data = pickle.load(f)
+
+    # Convert to numpy array if needed
+    data_np = np.array(data)
+    data_np = data_np.reshape(data_np.shape[0], data_np.shape[1] * data_np.shape[2])
+
+    # Split data (train, val datasets)
+    train_inputs, train_outputs, val_inputs, val_outputs = load_and_split_data(data_np)
+
+    # Initialize SVR model and train
+    svr_model = svr_regression(train_inputs, train_outputs, train_inputs, train_outputs)
+    svr_predictions = svr_model.predict(val_inputs)
+
+    print(svr_predictions.shape)  # Expected output: (51, 384*199)
+
+    # Compute losses
+    mean_abs_error_per_sample, max_abs_error_per_sample = compute_losses(val_outputs, svr_predictions)
+    fig_pth = os.path.join("ml_svr","figs")
+    os.makedirs(fig_pth,exist_ok=True)
+    for i in range(20):
+        truevalues = val_outputs[i].reshape(112, 192)
+        predict = svr_predictions[i].reshape(112, 192)
+        error_file_name = os.path.join(fig_pth, f'time_step{i}_error.png')
+        predicted_file_name = os.path.join(fig_pth, f'time_step{i}_predicted.png')
+        save_error(abs(truevalues - predict), error_file_name)
+        save_prediction(predict, predicted_file_name)
+
+    # Output the loss information
+    print(f"Mean Absolute Error per Sample: {mean_abs_error_per_sample}")
+    print(f"Max Absolute Error per Sample: {max_abs_error_per_sample}")
+
+    # # Create directory to save images if it doesn't exist
+    # output_dir = os.path.join("output_images", "svr_val")
+    # os.makedirs(output_dir, exist_ok=True)
+    #
+    # # Randomly select 5 samples to plot
+    # random_sample_indices = random.sample(range(51), 5)
+    # for idx in random_sample_indices:
+    #     ground_truth = val_outputs[idx].reshape(384, 199)
+    #     prediction = svr_predictions[idx].reshape(384, 199)
+    #
+    #     # Plot and save the error images
+    #     plot_and_save_difference(ground_truth, prediction, idx, output_dir)
+    #
+    # print(f"Validation completed. Results saved to {output_dir}")
+
+if __name__ == "__main__":
+
+    val()

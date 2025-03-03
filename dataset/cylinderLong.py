@@ -1,9 +1,9 @@
 import pickle
 import numpy as np
 import torch
-from torch.utils.data import Dataset
-
-
+from torch.utils.data import Dataset,DataLoader
+import math
+from scipy.interpolate import griddata
 class CylinderflowDatasetLSTMBeta(Dataset):
     def __init__(self, data_path, train=True, train_ratio=0.8, random_points=False, num_points=16,
                  slice_lengths=[2, 5, 10, 20, 30, 50]):
@@ -231,12 +231,17 @@ class CylinderDatasetMLP(Dataset):
         output = self.data[t_idx]
         return torch.tensor(input, dtype=torch.float32), torch.tensor(output, dtype=torch.float32)
 if __name__ == "__main__":
-    dataset = CylinderflowDatasetLSTMBeta('../data/Cy_Taira.pickle', train=True)
+    dataset = CylinderDatasetMLP('../data/Cy_Taira.pickle', train=True)
 
-# 创建批次采样器
-    batch_sampler = SameLengthBatchSampler(dataset.slices, batch_size=32)
+ # 创建批次采样器
+#     batch_sampler = SameLengthBatchSampler(dataset.slices, batch_size=32)
 
 # 创建数据加载器
-    dataloader = torch.utils.data.DataLoader(dataset, batch_sampler=batch_sampler)
-    for x,y in dataloader:
+    dataset_train = CylinderDatasetVoronoi1D('../data/Cy_Taira.pickle', train=True, train_ratio=0.8, random_points=False,
+                                             num_points=16)
+
+
+    trainloader = DataLoader(dataset_train, batch_size=16, shuffle=True, num_workers=8, pin_memory=True)
+
+    for x,y in trainloader:
         print(x.shape,y.shape)

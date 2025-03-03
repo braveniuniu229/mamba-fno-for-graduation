@@ -10,8 +10,9 @@ import tqdm
 from torch.utils.data import DataLoader
 from utils.tools import save_checkpoint,count_parameters, write_to_csv
 from models.mlp import MLP
-from dataset.cylinderdataset import CylinderDatasetMLP
+from dataset.cylinderLong import CylinderDatasetMLP
 from parsercylinder import parse_args
+
 # from tools.visualization import plot3x1
 from tools.utils import cre
 from tools.visualization import plot3x1,plot3x1forgif,generate_gif_from_data
@@ -36,8 +37,8 @@ dataset_train = CylinderDatasetMLP(args.data_pth, train=True, train_ratio=0.8, r
                                    num_points=args.num_points)
 dataset_test = CylinderDatasetMLP(args.data_pth, train=False, train_ratio=0.8, random_points=args.random,
                                   num_points=args.num_points)
-trainloader = DataLoader(dataset_train, batch_size=8, shuffle=True, num_workers=8, pin_memory=True)
-testloader = DataLoader(dataset_test, batch_size=8, shuffle=False, num_workers=8, pin_memory=True)
+trainloader = DataLoader(dataset_train, batch_size = 16, shuffle=True, num_workers=8, pin_memory=True)
+testloader = DataLoader(dataset_test, batch_size= 50, shuffle=False, num_workers=8, pin_memory=True)
 
 def train():
     args.best_record = {'epoch': -1, 'valloss': 1e10, 'trainloss': 1e10}

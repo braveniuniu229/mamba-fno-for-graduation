@@ -162,83 +162,6 @@ def train():
             net.train()
 
 
-            # Plotting
-            # if epoch % args.plot_freq == 0:
-            #     plot3x1(outputs[-1, 0, :, :].cpu().numpy(), pre[-1, :].reshape(112, 192).cpu().numpy(),
-            #             file_name=args.fig_path + f'/epoch{epoch}.png')
-            #
-
-
-def test():
-    # 加载模型
-
-    net = MambaPOD_time_FNO(
-        modes1=args.modes1,
-        modes2=args.modes2,
-        width=args.width,
-        d_model=args.d_model,
-        num_blocks=args.num_blocks,
-        d_state=args.d_state,
-        d_model_out=args.d_model_out,
-        rms_norm=True,
-        residual_in_fp32=True,
-        fused_add_norm=True,
-        final_pool_type="mean",
-        if_abs_pos_embed=True,
-        if_rope=False,
-        if_rope_residual=False,
-        bimamba_type="V2",
-        if_cls_token=True,
-        if_devide_out=True,
-        use_middle_cls_token=True
-    ).to(device)
-
-    # 加载checkpoint
-    checkpoint = torch.load(os.path.join(ckpt_dir, 'checkpoint_best.pth'))
-    net.load_state_dict(checkpoint['model_state_dict'])
-    net.eval()
-
-    total_l1_loss = 0.0
-    total_maxae_loss = 0.0
-    total_samples = 0
-
-    fields_list = []
-    pres_list = []
-    with torch.no_grad():
-        pbar = tqdm.tqdm(total=len(testloader), desc="Testing", leave=True, colour='white')
-        for inputs, outputs in testloader:
-            inputs, outputs = inputs.to(device), outputs.to(device)
-            outputs = outputs.squeeze(0)
-            pre = net(inputs).squeeze(0)
-            l1_loss_value = F.l1_loss(pre, outputs).item() * inputs.size(0)
-            maxae_loss_value = max_aeLoss(pre, outputs).item() * inputs.size(0)
-
-            total_l1_loss += l1_loss_value
-            total_maxae_loss += maxae_loss_value
-            total_samples += inputs.size(0)
-
-
-            # reshape outputs and predictions
-            pre_reshaped = pre.view(1, 31, 384, 199)
-            outputs_reshaped = outputs.view(1, 31, 384, 199)
-
-            for i in range(0, 31, 5):
-                true_values = outputs_reshaped[0, i].cpu().numpy()
-                predicted_values = pre_reshaped[0, i].cpu().numpy()
-
-                # plot3x1(true_values, predicted_values, file_name=os.path.join(fig_dir, f'figure_{i}.png'))
-                # # fields_list.append(true_values)
-                # # pres_list.append(predicted_values)
-
-            pbar.update(1)
-        avg_l1_loss = total_l1_loss / total_samples
-        avg_maxae_loss = total_maxae_loss / total_samples
-        # output_gif = os.path.join(fig_dir, 'output.gif')
-        # generate_gif_from_data(fields_list, pres_list, output_gif)
-        # print(f"GIF saved as {output_gif}")
-        #
-        print(f'Average L1 Loss: {avg_l1_loss}, Average Max AE Loss: {avg_maxae_loss}')
-
 def val():
     # Initialize the model
     net = MambaPOD_time_FNO(
@@ -271,61 +194,61 @@ def val():
     total_l1_loss = 0.0
     total_maxae_loss = 0.0
     total_samples = 0
+    saved_samples = 0  # Counter for saved samples
 
-
-
-    # Create a directory for saving figures if it doesn't exist
-    if not os.path.exists(fig_dir):
-        os.makedirs(fig_dir)
+    # Create figure directory
+    os.makedirs(fig_dir, exist_ok=True)
 
     with torch.no_grad():
-        pbar = tqdm.tqdm(total=len(testloader), desc="Validation", leave=True, colour='white')
-        for inputs, outputs in testloader:
+        pbar = tqdm.tqdm(total=len(testloader), desc="Testing", leave=True, colour='white')
+        for batch_idx, (inputs, outputs) in enumerate(testloader):
+            # Move data to device
             inputs, outputs = inputs.to(device), outputs.to(device)
 
-            # Get predictions from the model
+            # Forward pass
+            pred = net(inputs).squeeze(0)  # Remove batch dim
             outputs = outputs.squeeze(0)
-            pre = net(inputs).squeeze(0)
 
-            # Calculate L1 loss and MaxAE loss
-            l1_loss_value = F.l1_loss(pre, outputs).item() * inputs.size(0)
-            maxae_loss_value = max_aeLoss(pre, outputs).item() * inputs.size(0)
+            # Calculate losses
+            l1_loss = F.l1_loss(pred, outputs)
+            maxae_loss = max_aeLoss(pred, outputs)
 
-            total_l1_loss += l1_loss_value
-            total_maxae_loss += maxae_loss_value
+            # Accumulate metrics
+            total_l1_loss += l1_loss.item() * inputs.size(0)
+            total_maxae_loss += maxae_loss.item() * inputs.size(0)
             total_samples += inputs.size(0)
 
-            # Get the first 5 time steps for both predictions and true values
-            pre_reshaped = pre.view(51, 384, 199)  # Reshape to (time_steps, height, width)
-            outputs_reshaped = outputs.view(51, 384, 199)
+            # Save first 50 samples
+            if saved_samples < 50:
+                # Convert to numpy arrays
+                pred_np = pred.cpu().numpy().reshape(-1, 112, 192)  # (2000, 112, 192)
+                true_np = outputs.cpu().numpy().reshape(-1, 112, 192)
 
-            # For each of the first 5 time steps, plot and save the images
-            for i in range(20):
-                true_values = outputs_reshaped[i].cpu().numpy()  # (384, 199)
-                predicted_values = pre_reshaped[i].cpu().numpy()  # (384, 199)
+                # Save first 5 timesteps for each sample
+                for t in range(50):
+                    # Create unique filenames
+                    base_name = f"sample{saved_samples}_t{t}"
+                    save_prediction(true_np[t], os.path.join(fig_dir, f"{base_name}_true.png"))
+                    save_prediction(pred_np[t], os.path.join(fig_dir, f"{base_name}_pred.png"))
+                    save_error(np.abs(true_np[t] - pred_np[t]), os.path.join(fig_dir, f"{base_name}_error.png"))
 
-                # Define the file names for saving the plots
-                gt_file_name = os.path.join(fig_dir, f'time_step{i}_gt.png')
-                error_file_name = os.path.join(fig_dir, f'time_step{i}_error.png')
-                predicted_file_name = os.path.join(fig_dir, f'time_step{i}_predicted.png')
-                save_error(abs(true_values - predicted_values),error_file_name)
-                save_prediction(true_values,gt_file_name)
-                save_prediction(predicted_values,predicted_file_name)
-                # Plot and save the true values (labels)
+                saved_samples += 1
 
-
-            pbar.set_postfix(l1_loss=l1_loss_value, maxae_loss=maxae_loss_value)
             pbar.update(1)
+            pbar.set_postfix(l1_loss=l1_loss.item(), maxae_loss=maxae_loss.item())
 
-    avg_l1_loss = total_l1_loss / total_samples
-    avg_maxae_loss = total_maxae_loss / total_samples
+    # Calculate final metrics
+    avg_l1 = total_l1_loss / total_samples
+    avg_maxae = total_maxae_loss / total_samples
 
-    print(f"Validation L1 Loss: {avg_l1_loss:.4f}")
-    print(f"Validation MaxAE Loss: {avg_maxae_loss:.4f}")
+    print(f"\nTest Results:")
+    print(f"MAE: {avg_l1:.6f}")
+    print(f"Max-AE: {avg_maxae:.6f}")
+    print(f"Saved visualizations for {saved_samples} samples to {fig_dir}")
 
-    return avg_l1_loss, avg_maxae_loss
+    return avg_l1, avg_maxae
 
 if __name__ == '__main__':
     train()
-    print("best val loss{}".format(best_loss))
-    # val()
+    # print("best val loss{}".format(best_loss))
+    val()

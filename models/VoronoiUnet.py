@@ -93,6 +93,6 @@ class voronoiUNet(nn.Module):
 if __name__ == "__main__":
     device = torch.device("cuda")
     model = voronoiUNet().to(device)
-    x = torch.randn(5,2,384,199).to(device)
+    x = torch.randn(5,2,112,192).to(device)
     y = model(x)
     print(y.shape)

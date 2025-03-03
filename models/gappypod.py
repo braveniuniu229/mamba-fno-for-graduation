@@ -3,7 +3,7 @@ import numpy as np
 from sklearn.decomposition import PCA
 class GappyPodWeight1D():
     def __init__(self, data, map_size=16339, n_components=50,
-                 positions=np.array(np.linspace(0, 384 * 199-1, 16, dtype=int)), observe_weight=50):
+                 positions=np.array(np.linspace(0, 112 * 192-1, 16, dtype=int)), observe_weight=50):
         self.data = data
         self.pca = PCA(n_components=n_components)
         self.pca.fit(self.data.reshape(data.shape[0], -1))
